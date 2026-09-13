@@ -166,13 +166,12 @@ the change.
 
 ## Notes
 
-- Browser Use runs through [Cloud API v4](https://docs.browser-use.com/cloud/api-v4/runs/create-run) with
-  the vendor-default agent model. Its [managed stealth browser](https://docs.browser-use.com/cloud/browser/stealth)
-  and CAPTCHA handling are automatic; the adapter explicitly selects the
-  [US residential proxy](https://docs.browser-use.com/cloud/browser/proxies) and scores the completed run's
-  result text as the response body. That body is rendered text, not page source — v4 returns no raw DOM — so
-  the one target whose marker is a source-only token (`kroger`, matching `"upc":"..."`) cannot pass for
-  Browser Use even on a clean load. Its score is therefore a floor, understated by at most one of 99 targets.
+- Browser Use runs on a [standalone Cloud API v4 browser](https://docs.browser-use.com/cloud/browser/quickstart)
+  driven over CDP, not an agent run. Its [managed stealth browser](https://docs.browser-use.com/cloud/browser/stealth)
+  and CAPTCHA handling are automatic and the [US residential proxy](https://docs.browser-use.com/cloud/browser/proxies)
+  is pinned explicitly; the adapter scores the page source and the navigation's own HTTP status, so it is measured
+  on the same raw-body basis as every other provider. No agent model is involved, which keeps the score independent
+  of both vendor model defaults and any LLM's willingness to reproduce a marker verbatim.
 - All requests carry a per-attempt timeout (default 90s). The runner enforces it with an `AbortController`;
   adapters built on an SDK that takes no signal pass the same value as a client-side socket deadline instead.
 - Each provider is sent the strongest anti-bot configuration its public API offers: the best proxy pool
