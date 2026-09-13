@@ -113,7 +113,6 @@ export function createBrowserUseProvider(
       let runID: string | undefined;
       let sessionID: string | undefined;
       let status: BrowserUseRunStatus | undefined;
-      let browserStopAttempted = false;
 
       try {
         const created = parseRunCreated(
@@ -153,8 +152,9 @@ export function createBrowserUseProvider(
           throw new Error("Browser Use completed without a result");
         }
 
-        browserStopAttempted = true;
-        await stopBrowser(request, apiKey, sessionID);
+        /** WHY: detached — the runner times `fetch`, so teardown must not add latency or fail a verified result. */
+        void stopBrowser(request, apiKey, sessionID).catch(() => {});
+        /** WHY: v4 exposes no per-navigation HTTP status, so a completed run is the only upstream success signal available. */
         return { body: summary.result, statusCode: 200 };
       } catch (error) {
         const cleanupErrors: unknown[] = [];
@@ -169,7 +169,7 @@ export function createBrowserUseProvider(
             cleanupErrors.push(cancellationError);
           }
         }
-        if (sessionID !== undefined && !browserStopAttempted) {
+        if (sessionID !== undefined) {
           try {
             await stopBrowser(request, apiKey, sessionID);
           } catch (stopError) {

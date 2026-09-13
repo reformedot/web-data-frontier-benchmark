@@ -72,6 +72,55 @@ test("creates a v4 run with a US residential proxy and stops its browser", async
   assert.deepEqual(JSON.parse(String(requests[4].init?.body)), { action: "stop" });
 });
 
+test("keeps a verified result when browser teardown fails", async () => {
+  process.env.BROWSER_USE_API_KEY = "test-key";
+  const requests: RecordedRequest[] = [];
+  const provider = providerWithResponses(
+    [
+      response({ id: "run-4", sessionId: "session-4", status: "queued" }),
+      response({ status: "completed" }),
+      response({ status: "completed", result: "Example Domain", error: null }),
+      response({ detail: "teardown unavailable" }, 500)
+    ],
+    requests
+  );
+
+  const result = await provider.fetch("https://example.com", {
+    timeoutMs: 1_000,
+    signal: new AbortController().signal
+  });
+
+  assert.deepEqual(result, { body: "Example Domain", statusCode: 200 });
+  assert.equal(requests.at(-1)?.url, "https://api.browser-use.com/api/v4/browsers/session-4");
+  // Give the detached teardown a turn to reject; an unhandled rejection would fail the run.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+});
+
+test("returns without waiting for browser teardown", async () => {
+  process.env.BROWSER_USE_API_KEY = "test-key";
+  let finishTeardown = (): void => {};
+  const teardown = new Promise<Response>((resolve) => {
+    finishTeardown = () => resolve(response({ status: "stopped" }));
+  });
+  const provider = createBrowserUseProvider(async (input) => {
+    const target = String(input);
+    if (target.includes("/browsers/")) return teardown;
+    if (target.endsWith("/status")) return response({ status: "completed" });
+    if (target.endsWith("/runs")) return response({ id: "run-5", sessionId: "session-5", status: "queued" });
+    return response({ status: "completed", result: "Example Domain", error: null });
+  }, async () => {});
+
+  // Resolves only because the teardown PATCH is detached — awaiting it would deadlock here.
+  const result = await provider.fetch("https://example.com", {
+    timeoutMs: 1_000,
+    signal: new AbortController().signal
+  });
+
+  assert.deepEqual(result, { body: "Example Domain", statusCode: 200 });
+  finishTeardown();
+  await teardown;
+});
+
 test("surfaces a terminal Browser Use failure", async () => {
   process.env.BROWSER_USE_API_KEY = "test-key";
   const provider = providerWithResponses(
