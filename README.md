@@ -117,6 +117,7 @@ npm run analyze -- --in official_results/benchmark-2026-08-11T22-44-25-322Z.json
 
 | Provider                           | Required `.env` var(s)                                    |
 | ---------------------------------- | --------------------------------------------------------- |
+| browser_use (Browser Use Cloud)    | `BROWSER_USE_API_KEY`                                     |
 | bright (Bright Data Web Unblocker) | `BRIGHT_API_KEY` + `BRIGHT_ZONE`                          |
 | zyte                               | `ZYTE_API_KEY`                                            |
 | scrapfly                           | `SCRAPFLY_API_KEY`                                        |
@@ -165,6 +166,11 @@ the change.
 
 ## Notes
 
+- Browser Use runs through [Cloud API v4](https://docs.browser-use.com/cloud/api-v4/runs/create-run) with
+  the vendor-default agent model. Its [managed stealth browser](https://docs.browser-use.com/cloud/browser/stealth)
+  and CAPTCHA handling are automatic; the adapter explicitly selects the
+  [US residential proxy](https://docs.browser-use.com/cloud/browser/proxies) and scores the completed run's
+  result text as the response body.
 - All requests carry a per-attempt timeout (default 90s). The runner enforces it with an `AbortController`;
   adapters built on an SDK that takes no signal pass the same value as a client-side socket deadline instead.
 - Each provider is sent the strongest anti-bot configuration its public API offers: the best proxy pool
