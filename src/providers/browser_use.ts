@@ -157,27 +157,16 @@ export function createBrowserUseProvider(
         /** WHY: v4 exposes no per-navigation HTTP status, so a completed run is the only upstream success signal available. */
         return { body: summary.result, statusCode: 200 };
       } catch (error) {
-        const cleanupErrors: unknown[] = [];
+        /** WHY: detached like the success path — awaiting two 5s cleanups would push a timed-out attempt well past the runner's deadline and bury the real cause. */
         const runIsActive = runID !== undefined && status !== "completed" && status !== "failed" && status !== "cancelled";
         if (runIsActive) {
-          try {
-            await requestJSON(request, apiKey, `/runs/${runID}/cancel`, {
-              method: "POST",
-              signal: AbortSignal.timeout(CANCELLATION_TIMEOUT_MS)
-            });
-          } catch (cancellationError) {
-            cleanupErrors.push(cancellationError);
-          }
+          void requestJSON(request, apiKey, `/runs/${runID}/cancel`, {
+            method: "POST",
+            signal: AbortSignal.timeout(CANCELLATION_TIMEOUT_MS)
+          }).catch(() => {});
         }
         if (sessionID !== undefined) {
-          try {
-            await stopBrowser(request, apiKey, sessionID);
-          } catch (stopError) {
-            cleanupErrors.push(stopError);
-          }
-        }
-        if (cleanupErrors.length > 0) {
-          throw new AggregateError([error, ...cleanupErrors], "Browser Use request cleanup failed");
+          void stopBrowser(request, apiKey, sessionID).catch(() => {});
         }
         throw error;
       }

@@ -166,3 +166,44 @@ test("cancels a nonterminal run after a polling error", async () => {
     ]
   );
 });
+
+test("rejects without waiting for failure-path cleanup", async () => {
+  process.env.BROWSER_USE_API_KEY = "test-key";
+  let finishCleanup = (): void => {};
+  const cleanup = new Promise<Response>((resolve) => {
+    finishCleanup = () => resolve(response({ status: "cancelled" }));
+  });
+  const provider = createBrowserUseProvider(async (input) => {
+    const target = String(input);
+    if (target.endsWith("/runs")) return response({ id: "run-6", sessionId: "session-6", status: "queued" });
+    if (target.endsWith("/status")) return response({ detail: "temporary error" }, 500);
+    // Both cancel and stop hang; awaiting either would hold the attempt past its deadline.
+    return cleanup;
+  }, async () => {});
+
+  await assert.rejects(
+    provider.fetch("https://example.com", { timeoutMs: 1_000, signal: new AbortController().signal }),
+    /Browser Use request failed with status 500/
+  );
+  finishCleanup();
+  await cleanup;
+});
+
+test("reports the underlying cause when cleanup also fails", async () => {
+  process.env.BROWSER_USE_API_KEY = "test-key";
+  const provider = providerWithResponses(
+    [
+      response({ id: "run-7", sessionId: "session-7", status: "queued" }),
+      response({ detail: "temporary error" }, 500),
+      response({ detail: "cancel unavailable" }, 503),
+      response({ detail: "stop unavailable" }, 503)
+    ],
+    []
+  );
+
+  await assert.rejects(provider.fetch("https://example.com", { timeoutMs: 1_000, signal: new AbortController().signal }), {
+    name: "Error",
+    message: /Browser Use request failed with status 500/
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+});
