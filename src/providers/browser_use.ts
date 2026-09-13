@@ -4,8 +4,18 @@ import { requireEnv } from "./_shared.js";
 
 const API_BASE_URL = "https://api.browser-use.com/api/v4";
 const TEARDOWN_TIMEOUT_MS = 5_000;
-/** Server-side backstop in minutes: above the runner's per-attempt timeout, far below the 60-minute default. */
-const SESSION_TIMEOUT_MINUTES = 5;
+const MIN_SESSION_TIMEOUT_MINUTES = 1;
+const MAX_SESSION_TIMEOUT_MINUTES = 240;
+
+/**
+ * Server-side backstop for a browser that outlives its teardown, in whole minutes as the API takes it.
+ * Rounding the attempt timeout up keeps it just past the runner's own deadline — at the default 90s that
+ * is 2 minutes, against an API default of 60 — and it tracks a `--timeout` override instead of drifting.
+ */
+function sessionTimeoutMinutes(timeoutMs: number): number {
+  const minutes = Math.ceil(timeoutMs / 60_000);
+  return Math.min(Math.max(minutes, MIN_SESSION_TIMEOUT_MINUTES), MAX_SESSION_TIMEOUT_MINUTES);
+}
 
 type RequestFunction = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 type ConnectFunction = (cdpUrl: string) => Promise<Browser>;
@@ -72,7 +82,7 @@ export function createBrowserUseProvider(
           await requestJSON(request, apiKey, "/browsers", {
             method: "POST",
             /** WHY: proxy settings sit at the top level here; `browserSettings` is the agent-run shape and is rejected. */
-            body: JSON.stringify({ proxyCountryCode: "us", timeout: SESSION_TIMEOUT_MINUTES }),
+            body: JSON.stringify({ proxyCountryCode: "us", timeout: sessionTimeoutMinutes(timeoutMs) }),
             signal
           })
         );

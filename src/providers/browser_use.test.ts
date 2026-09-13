@@ -66,9 +66,11 @@ function providerWithResponses(responses: Response[], requests: RecordedRequest[
 }
 
 const SESSION = { id: "session-1", cdpUrl: "wss://cdp.browser-use.com/session-1" };
+/** The suite's own per-attempt timeout (`src/tests.const.ts`), so the derived session cap is exercised as configured. */
+const BENCHMARK_TIMEOUT_MS = 90_000;
 
-function fetchOptions() {
-  return { timeoutMs: 1_000, signal: new AbortController().signal };
+function fetchOptions(timeoutMs = BENCHMARK_TIMEOUT_MS) {
+  return { timeoutMs, signal: new AbortController().signal };
 }
 
 test("registers Browser Use behind its API key", () => {
@@ -85,7 +87,7 @@ test("creates a standalone US-proxied browser and returns the page source", asyn
 
   assert.deepEqual(result, { body: "<html><body>Example Domain</body></html>", statusCode: 200 });
   assert.deepEqual(fake.visited(), ["https://example.com"]);
-  assert.deepEqual(fake.gotoOptions(), { timeout: 1_000, waitUntil: "domcontentloaded" });
+  assert.deepEqual(fake.gotoOptions(), { timeout: BENCHMARK_TIMEOUT_MS, waitUntil: "domcontentloaded" });
   assert.deepEqual(
     requests.map(({ url, init }) => ({ url, method: init?.method })),
     [
@@ -94,7 +96,8 @@ test("creates a standalone US-proxied browser and returns the page source", asyn
     ]
   );
   // Proxy settings are top-level on /browsers; the agent-run `browserSettings` wrapper is rejected there.
-  assert.deepEqual(JSON.parse(String(requests[0].init?.body)), { proxyCountryCode: "us", timeout: 5 });
+  // 90s of attempt timeout rounds up to a 2-minute session cap, not the API's 60-minute default.
+  assert.deepEqual(JSON.parse(String(requests[0].init?.body)), { proxyCountryCode: "us", timeout: 2 });
   assert.deepEqual(requests[0].init?.headers, {
     "Content-Type": "application/json",
     "X-Browser-Use-API-Key": "test-key"
@@ -214,4 +217,22 @@ test("returns without waiting for teardown", async () => {
   assert.equal(fake.closed(), true);
   finishTeardown();
   await teardown;
+});
+
+test("caps the session just past the attempt timeout, within the API's range", async () => {
+  process.env.BROWSER_USE_API_KEY = "test-key";
+  const sessionTimeouts = async (timeoutMs: number): Promise<number> => {
+    const requests: RecordedRequest[] = [];
+    const fake = fakeBrowser("<html>ok</html>");
+    const provider = providerWithResponses([response(SESSION), response({ status: "stopped" })], requests, fake.browser);
+    await provider.fetch("https://example.com", fetchOptions(timeoutMs));
+    return JSON.parse(String(requests[0].init?.body)).timeout;
+  };
+
+  // A sub-minute attempt still has to ask for the API's 1-minute floor rather than 0.
+  assert.equal(await sessionTimeouts(30_000), 1);
+  assert.equal(await sessionTimeouts(BENCHMARK_TIMEOUT_MS), 2);
+  assert.equal(await sessionTimeouts(600_000), 10);
+  // And a timeout past the 240-minute ceiling clamps instead of being rejected as out of range.
+  assert.equal(await sessionTimeouts(20_000_000), 240);
 });
