@@ -48,7 +48,7 @@ export const WEB_ACCESS_ALL_TESTS: WebAccessTestConfig[] = [
   },
   {
     name: "safeway",
-    url: "https://www.safeway.com/shop/product-details.960457331.html",
+    url: "https://www.safeway.com/shop/pd/waterfront-bistro-shrimp-coconut-with-sweet-chili-sauce-10-ct/960457331",
     antibot: "incapsula",
     industry: "Grocery & food",
     containsText: "Waterfront Bistro Shrimp Coconut With Sweet Chili Sauce",
@@ -139,10 +139,10 @@ export const WEB_ACCESS_ALL_TESTS: WebAccessTestConfig[] = [
   },
   {
     name: "zara",
-    url: "https://www.zara.com/us/en/100-linen-pocket-overshirt-p00706754.html",
+    url: "https://www.zara.com/us/en/100-linen-zip-up-overshirt-p04410115.html",
     antibot: "akamai",
     industry: "Fashion & luxury",
-    containsText: "100% LINEN POCKET OVERSHIRT",
+    containsText: "100% LINEN ZIP OVERSHIRT",
   },
   {
     name: "louisvuitton",
@@ -692,5 +692,11 @@ export const WEB_ACCESS_ALL_TESTS: WebAccessTestConfig[] = [
     url: "https://arxiv.org/abs/1706.03762",
     industry: "Developer & research",
     containsText: "Computer Science > Computation and Language",
+  },
+  {
+    name: "buybuybaby",
+    url: "https://buybuybaby.bedbathandbeyond.com/Baby/Cloud-Muslin-Sage-WHite-5pc-Bedding-Set-Levtex-Baby/43435980/product.html",
+    industry: "Retail & ecommerce",
+    containsText: "Cloud Muslin Sage/WHite 5pc Bedding Set - Levtex Baby",
   },
 ];
