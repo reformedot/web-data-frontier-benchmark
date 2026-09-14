@@ -87,7 +87,8 @@ test("creates a standalone US-proxied browser and returns the page source", asyn
 
   assert.deepEqual(result, { body: "<html><body>Example Domain</body></html>", statusCode: 200 });
   assert.deepEqual(fake.visited(), ["https://example.com"]);
-  assert.deepEqual(fake.gotoOptions(), { timeout: BENCHMARK_TIMEOUT_MS, waitUntil: "domcontentloaded" });
+  // The navigation timeout is whatever is left of the attempt deadline, so it is asserted below.
+  assert.equal((fake.gotoOptions() as { waitUntil: string }).waitUntil, "domcontentloaded");
   assert.deepEqual(
     requests.map(({ url, init }) => ({ url, method: init?.method })),
     [
@@ -161,16 +162,100 @@ test("surfaces a create-browser failure without a teardown call", async () => {
   );
 });
 
-test("rejects a browser created without a CDP URL", async () => {
+test("stops a browser created without a usable CDP URL", async () => {
   process.env.BROWSER_USE_API_KEY = "test-key";
+  const requests: RecordedRequest[] = [];
   const fake = fakeBrowser("");
   const provider = providerWithResponses(
     [response({ id: "session-2", cdpUrl: null }), response({ status: "stopped" })],
-    [],
+    requests,
     fake.browser
   );
 
   await assert.rejects(provider.fetch("https://example.com", fetchOptions()), /created a browser without a CDP URL/);
+  // The create succeeded, so this session bills until its cap unless teardown still fires for it.
+  assert.deepEqual(
+    requests.map(({ url, init }) => ({ url, method: init?.method })),
+    [
+      { url: "https://api.browser-use.com/api/v4/browsers", method: "POST" },
+      { url: "https://api.browser-use.com/api/v4/browsers/session-2", method: "PATCH" }
+    ]
+  );
+});
+
+/** A provider whose create call succeeds and whose CDP connection takes `connectMs` of the attempt. */
+function providerWithSlowConnect(connectMs: number, browser: Browser, onConnect: (timeoutMs: number) => void = () => {}) {
+  return createBrowserUseProvider(
+    async (input) => (String(input).endsWith("/browsers") ? response(SESSION) : response({ status: "stopped" })),
+    async (_cdpUrl, timeoutMs) => {
+      onConnect(timeoutMs);
+      await new Promise((resolve) => setTimeout(resolve, connectMs));
+      return browser;
+    }
+  );
+}
+
+test("spends one deadline across connection and navigation", async () => {
+  process.env.BROWSER_USE_API_KEY = "test-key";
+  const fake = fakeBrowser("<html>ok</html>");
+  let connectTimeout: number | undefined;
+  const provider = providerWithSlowConnect(150, fake.browser, (timeoutMs) => {
+    connectTimeout = timeoutMs;
+  });
+
+  await provider.fetch("https://example.com", fetchOptions(1_000));
+
+  // The connection is bounded at all, and by the attempt's budget rather than playwright's own default.
+  assert.ok(connectTimeout !== undefined && connectTimeout <= 1_000, `connect timeout was ${connectTimeout}`);
+  // It then burned ~150ms of that second, so navigation gets what is left instead of a fresh 1_000.
+  const { timeout } = fake.gotoOptions() as { timeout: number };
+  assert.ok(timeout > 0 && timeout <= 850, `navigation timeout ${timeout} should exclude the connection time`);
+});
+
+test("fails an attempt whose budget is gone instead of navigating past it", async () => {
+  process.env.BROWSER_USE_API_KEY = "test-key";
+  const fake = fakeBrowser("<html>ok</html>");
+  const provider = providerWithSlowConnect(80, fake.browser);
+
+  await assert.rejects(provider.fetch("https://example.com", fetchOptions(50)), /exceeded its timeout/);
+  // Recorded as a failure rather than a success the runner would credit with an over-deadline latency.
+  assert.deepEqual(fake.visited(), []);
+});
+
+test("bounds content extraction by the deadline too", async () => {
+  process.env.BROWSER_USE_API_KEY = "test-key";
+  const fake = fakeBrowser("<html>ok</html>");
+  // `page.content()` takes no timeout of its own, so a stalled extraction is only bounded from outside.
+  const stalling = {
+    ...fake.browser,
+    contexts: () => [{ pages: () => [{ content: () => new Promise<string>(() => {}), goto: async () => ({ status: () => 200 }) }] }]
+  };
+  const provider = providerWithResponses(
+    [response(SESSION), response({ status: "stopped" })],
+    [],
+    stalling as unknown as Browser
+  );
+
+  await assert.rejects(provider.fetch("https://example.com", fetchOptions(120)), /exceeded its timeout/);
+});
+
+test("observes the runner's abort signal after the create call", async () => {
+  process.env.BROWSER_USE_API_KEY = "test-key";
+  const controller = new AbortController();
+  const fake = fakeBrowser("<html>ok</html>");
+  const provider = createBrowserUseProvider(
+    async (input) => (String(input).endsWith("/browsers") ? response(SESSION) : response({ status: "stopped" })),
+    async () => {
+      controller.abort();
+      return fake.browser;
+    }
+  );
+
+  await assert.rejects(
+    provider.fetch("https://example.com", { timeoutMs: BENCHMARK_TIMEOUT_MS, signal: controller.signal }),
+    /aborted by the runner/
+  );
+  assert.deepEqual(fake.visited(), []);
 });
 
 test("logs a failed teardown rather than dropping a billable session", async () => {

@@ -18,25 +18,57 @@ function sessionTimeoutMinutes(timeoutMs: number): number {
 }
 
 type RequestFunction = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
-type ConnectFunction = (cdpUrl: string) => Promise<Browser>;
-
-interface BrowserSession {
-  id: string;
-  cdpUrl: string;
-}
+type ConnectFunction = (cdpUrl: string, timeoutMs: number) => Promise<Browser>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function parseBrowserSession(value: unknown): BrowserSession {
-  if (!isRecord(value) || typeof value.id !== "string") {
+/**
+ * WHY: read before the CDP URL is validated. A create response carrying an id but no `cdpUrl` has
+ * already provisioned a billable browser, so the id has to be in hand before anything can throw.
+ */
+function parseSessionID(value: unknown): string {
+  if (!isRecord(value) || typeof value.id !== "string" || value.id === "") {
     throw new Error("Browser Use returned an invalid create-browser response");
   }
-  if (typeof value.cdpUrl !== "string" || value.cdpUrl === "") {
+  return value.id;
+}
+
+function parseCdpUrl(value: unknown): string {
+  if (!isRecord(value) || typeof value.cdpUrl !== "string" || value.cdpUrl === "") {
     throw new Error("Browser Use created a browser without a CDP URL");
   }
-  return { id: value.id, cdpUrl: value.cdpUrl };
+  return value.cdpUrl;
+}
+
+/**
+ * WHY: `makeExecutor` aborts its signal at the deadline but then just awaits `fetch`, so the provider
+ * is the only thing enforcing the per-attempt limit. This adapter spends its budget over four steps,
+ * so each one reads what is left of a single deadline rather than starting a fresh `timeoutMs` — a
+ * navigation that finishes past the deadline has to fail, not score as a success with inflated latency.
+ */
+function remainingBudget(expiresAt: number, signal: AbortSignal): number {
+  if (signal.aborted) throw new Error("Browser Use attempt was aborted by the runner");
+  const remainingMs = expiresAt - Date.now();
+  if (remainingMs <= 0) throw new Error("Browser Use attempt exceeded its timeout");
+  return remainingMs;
+}
+
+/** WHY: `page.content()` accepts no timeout of its own, so the deadline has to be imposed around it. */
+async function withinBudget<T>(work: Promise<T>, remainingMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("Browser Use attempt exceeded its timeout")), remainingMs);
+  });
+  /** WHY: once the deadline wins the race nothing awaits `work` — claim its rejection so it stays handled. */
+  void work.catch(() => {});
+
+  try {
+    return await Promise.race([work, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function requestJSON(request: RequestFunction, apiKey: string, path: string, init: RequestInit): Promise<unknown> {
@@ -67,41 +99,45 @@ async function stopBrowser(request: RequestFunction, apiKey: string, sessionID: 
 
 export function createBrowserUseProvider(
   request: RequestFunction = globalThis.fetch,
-  connect: ConnectFunction = (cdpUrl) => chromium.connectOverCDP(cdpUrl)
+  connect: ConnectFunction = (cdpUrl, timeoutMs) => chromium.connectOverCDP(cdpUrl, { timeout: timeoutMs })
 ): Provider {
   return {
     name: "browser_use",
     envKeys: ["BROWSER_USE_API_KEY"],
     async fetch(url, { timeoutMs, signal }) {
       const apiKey = requireEnv("BROWSER_USE_API_KEY");
-      let session: BrowserSession | undefined;
+      const expiresAt = Date.now() + timeoutMs;
+      let sessionID: string | undefined;
       let browser: Browser | undefined;
 
       try {
-        session = parseBrowserSession(
-          await requestJSON(request, apiKey, "/browsers", {
-            method: "POST",
-            /** WHY: proxy settings sit at the top level here; `browserSettings` is the agent-run shape and is rejected. */
-            body: JSON.stringify({ proxyCountryCode: "us", timeout: sessionTimeoutMinutes(timeoutMs) }),
-            signal
-          })
-        );
+        const created = await requestJSON(request, apiKey, "/browsers", {
+          method: "POST",
+          /** WHY: proxy settings sit at the top level here; `browserSettings` is the agent-run shape and is rejected. */
+          body: JSON.stringify({ proxyCountryCode: "us", timeout: sessionTimeoutMinutes(timeoutMs) }),
+          signal
+        });
+        sessionID = parseSessionID(created);
 
-        browser = await connect(session.cdpUrl);
+        browser = await connect(parseCdpUrl(created), remainingBudget(expiresAt, signal));
         const context = browser.contexts()[0] ?? (await browser.newContext());
         const page = context.pages()[0] ?? (await context.newPage());
 
-        const response = await page.goto(url, { timeout: timeoutMs, waitUntil: "domcontentloaded" });
+        const response = await page.goto(url, {
+          timeout: remainingBudget(expiresAt, signal),
+          waitUntil: "domcontentloaded"
+        });
         if (!response) throw new Error("Browser Use navigation returned no response");
-        return { body: await page.content(), statusCode: response.status() };
+        const body = await withinBudget(page.content(), remainingBudget(expiresAt, signal));
+        return { body, statusCode: response.status() };
       } finally {
         /** WHY: detached — the runner times `fetch`, so teardown must not add latency or fail a verified result. */
         void browser?.close().catch(() => {});
-        if (session !== undefined) {
-          const sessionID = session.id;
-          void stopBrowser(request, apiKey, sessionID).catch((error: unknown) => {
+        if (sessionID !== undefined) {
+          const stopping = sessionID;
+          void stopBrowser(request, apiKey, stopping).catch((error: unknown) => {
             const reason = error instanceof Error ? error.message : String(error);
-            console.warn(`browser_use: failed to stop session ${sessionID}, billing until its timeout — ${reason}`);
+            console.warn(`browser_use: failed to stop session ${stopping}, billing until its timeout — ${reason}`);
           });
         }
       }

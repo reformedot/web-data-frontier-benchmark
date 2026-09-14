@@ -174,6 +174,9 @@ the change.
   of both vendor model defaults and any LLM's willingness to reproduce a marker verbatim.
 - All requests carry a per-attempt timeout (default 90s). The runner enforces it with an `AbortController`;
   adapters built on an SDK that takes no signal pass the same value as a client-side socket deadline instead.
+  Browser Use is the only multi-step adapter — create, connect, navigate, extract — so it holds one deadline
+  for the attempt and gives each step just what is left of it, rather than restarting the budget per call.
+  An attempt that runs past the deadline is scored as a failure, not as a success with an inflated latency.
 - Each provider is sent the strongest anti-bot configuration its public API offers: the best proxy pool
   the vendor sells, plus any explicit stealth or bypass switch. JS rendering is a separate axis and is not
   part of the bypass, so it stays off wherever the vendor allows both and every provider is compared on the
