@@ -10,9 +10,9 @@ const client = lazy(() =>
     baseURL: STRING_BASE_URL,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${requireEnv("STRING_API_KEY")}`
-    }
-  })
+      Authorization: `Bearer ${requireEnv("STRING_API_KEY")}`,
+    },
+  }),
 );
 
 /** String — POST /fetch on the hosted service. */
@@ -21,17 +21,19 @@ export const string: Provider = {
   envKeys: ["STRING_API_KEY"],
   async fetch(url, { timeoutMs, signal }) {
     try {
-      const response = await client().request<{ data?: unknown; statusCode?: number }>({
+      const response = await client().request<Record<string, unknown> & { data?: unknown; statusCode?: number }>({
         url: "/fetch",
         method: "POST",
         data: { url, method: "GET" },
         signal,
-        timeout: timeoutMs
+        timeout: timeoutMs,
       });
 
-      return { body: normalizeBody(response.data.data), statusCode: response.data.statusCode ?? response.status };
+      const payload = response.data;
+      const body = normalizeBody(payload && typeof payload === "object" && "data" in payload ? payload.data : payload);
+      return { body, statusCode: payload?.statusCode ?? response.status };
     } catch (e) {
       throw new Error(httpErrorMessage("String", e));
     }
-  }
+  },
 };
