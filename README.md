@@ -117,6 +117,7 @@ npm run analyze -- --in official_results/benchmark-2026-08-11T22-44-25-322Z.json
 
 | Provider                           | Required `.env` var(s)                                    |
 | ---------------------------------- | --------------------------------------------------------- |
+| apify (Web Fetch Actor)            | `APIFY_TOKEN`                                             |
 | bright (Bright Data Web Unblocker) | `BRIGHT_API_KEY` + `BRIGHT_ZONE`                          |
 | zyte                               | `ZYTE_API_KEY`                                            |
 | scrapfly                           | `SCRAPFLY_API_KEY`                                        |
@@ -165,6 +166,10 @@ the change.
 
 ## Notes
 
+- Apify sends every target to the [Web Fetch](https://apify.com/apify/web-fetch) Actor's Standby endpoint
+  with `formats: ["raw"]` and `unwrap: true`, so the body is the original HTML and the status code is the
+  target's own. The Actor exposes no stealth setting: all fetches go through Apify Proxy's Unblocker group,
+  which escalates to browser rendering on its own when a site needs it.
 - All requests carry a per-attempt timeout (default 90s). The runner enforces it with an `AbortController`;
   adapters built on an SDK that takes no signal pass the same value as a client-side socket deadline instead.
 - Each provider is sent the strongest anti-bot configuration its public API offers: the best proxy pool
