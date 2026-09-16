@@ -6,6 +6,8 @@ import { makeExecutor, runWebAccessBenchmarkSuite } from "./runner.js";
 import { WEB_ACCESS_BENCHMARK_CONFIG, WEB_ACCESS_SUITES } from "./tests.const.js";
 import type { Provider, WebAccessBenchmarkConfig, WebAccessTestConfig } from "./types.js";
 
+const DEFAULT_SUITE = "default";
+
 interface CliOptions {
   providers?: string[];
   suite?: string;
@@ -68,7 +70,7 @@ Usage:
 
 Options:
   --providers <a,b>    Only run these providers (default: all with keys set)
-  --suite <name>       Target suite to draw from: ${Object.keys(WEB_ACCESS_SUITES).join(", ")} (default: default)
+  --suite <name>       Target suite to draw from: ${Object.keys(WEB_ACCESS_SUITES).join(", ")} (default: ${DEFAULT_SUITE})
   --tests <a,b>        Only run these test fixtures by name (default: all in the suite)
   --attempts <n>       Attempts per test (default: ${WEB_ACCESS_BENCHMARK_CONFIG.attemptsPerTest})
   --concurrency <n>    Parallel requests per provider (default: ${WEB_ACCESS_BENCHMARK_CONFIG.concurrency})
@@ -96,12 +98,7 @@ function selectProviders(opts: CliOptions): { active: Provider[]; skipped: strin
   return { active, skipped };
 }
 
-function selectTests(opts: CliOptions): WebAccessTestConfig[] {
-  const suiteName = opts.suite ?? "default";
-  const suite = WEB_ACCESS_SUITES[suiteName];
-  if (!suite) {
-    throw new Error(`Unknown suite "${suiteName}" — choose one of: ${Object.keys(WEB_ACCESS_SUITES).join(", ")}`);
-  }
+function selectTests(suite: WebAccessTestConfig[], opts: CliOptions): WebAccessTestConfig[] {
   if (!opts.tests) return suite;
   const wanted = new Set(opts.tests.map((t) => t.toLowerCase()));
   return suite.filter((t) => wanted.has(t.name.toLowerCase()));
@@ -120,7 +117,14 @@ async function main(): Promise<void> {
   }
 
   const { active, skipped } = selectProviders(opts);
-  const tests = selectTests(opts);
+  const suiteName = opts.suite ?? DEFAULT_SUITE;
+  const suite = WEB_ACCESS_SUITES[suiteName];
+  if (!suite) {
+    console.error(`Unknown suite "${suiteName}" — choose one of: ${Object.keys(WEB_ACCESS_SUITES).join(", ")}`);
+    process.exitCode = 1;
+    return;
+  }
+  const tests = selectTests(suite, opts);
 
   const config: WebAccessBenchmarkConfig = {
     ...WEB_ACCESS_BENCHMARK_CONFIG,
@@ -132,7 +136,7 @@ async function main(): Promise<void> {
   console.log(`\nActive providers (${active.length}): ${active.map((p) => p.name).join(", ") || "none"}`);
   if (skipped.length) console.log(`Skipped: ${skipped.join(", ")}`);
   console.log(
-    `Suite: ${opts.suite ?? "default"} | tests: ${tests.length} | attempts: ${config.attemptsPerTest} | concurrency: ${config.concurrency} | provider-concurrency: ${config.providerConcurrency}\n`
+    `Suite: ${suiteName} | tests: ${tests.length} | attempts: ${config.attemptsPerTest} | concurrency: ${config.concurrency} | provider-concurrency: ${config.providerConcurrency}\n`
   );
 
   if (active.length === 0) {

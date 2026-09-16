@@ -702,13 +702,9 @@ export const WEB_ACCESS_ALL_TESTS: WebAccessTestConfig[] = [
 ];
 
 /**
- * Automotive and vehicle-history targets: European car classifieds plus the North American
- * salvage-auction sources that back VIN history lookups.
- *
- * Kept out of `WEB_ACCESS_ALL_TESTS` on purpose. That array is the published suite behind the
- * reported headline numbers, so adding targets to it would silently change the composition and
- * make a new run non-comparable with earlier ones. Select this suite explicitly instead:
- * `--suite automotive`.
+ * Deliberately kept out of `WEB_ACCESS_ALL_TESTS`: that array is the published suite behind the
+ * reported headline numbers, so adding targets to it would change its composition and make a new
+ * run non-comparable with earlier ones. Select these with `--suite automotive` instead.
  */
 export const WEB_ACCESS_AUTOMOTIVE_TESTS: WebAccessTestConfig[] = [
   {
@@ -740,8 +736,7 @@ export const WEB_ACCESS_AUTOMOTIVE_TESTS: WebAccessTestConfig[] = [
     containsText: "PKW-Suche",
   },
   {
-    // No vendor anti-bot observed on this path; the only captcha references belong to the
-    // sign-in flow, so `antibot` is left unset rather than guessed.
+    // Unset, not unfilled: no vendor header on this path, and its only captcha is the sign-in flow.
     name: "autoscout24",
     url: "https://www.autoscout24.com/lst",
     industry: "Automotive & vehicle data",
@@ -770,7 +765,7 @@ export const WEB_ACCESS_AUTOMOTIVE_TESTS: WebAccessTestConfig[] = [
   },
 ];
 
-/** Selectable target suites. `default` is the published suite; everything else is opt-in. */
+/** `default` is the published suite; every other entry is opt-in via `--suite`. */
 export const WEB_ACCESS_SUITES: Record<string, WebAccessTestConfig[]> = {
   default: WEB_ACCESS_ALL_TESTS,
   automotive: WEB_ACCESS_AUTOMOTIVE_TESTS,
