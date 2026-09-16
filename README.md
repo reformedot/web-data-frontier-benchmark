@@ -1,6 +1,6 @@
 # Web Data Frontier Benchmark
 
-Compare web access APIs (web unblockers / scrape APIs) head-to-head against a fixed suite of 99
+Compare web access APIs (web unblockers / scrape APIs) head-to-head against a fixed suite of 100
 real-world, bot-protected URLs spanning 16 industries (Amazon, Walmart, Zillow, Cloudflare/PerimeterX-guarded
 retail and travel sites, etc. — see [Target sites](#target-sites) for the full list). Each provider is sent
 the same URLs; a request **passes** when the API returns a `2xx` status **and** the response body contains
@@ -10,32 +10,27 @@ Read the full write-up: [The Web Scraping Benchmark Problem](https://www.usestri
 
 ## Results
 
-Official run: **August 11, 2026** (99 targets × 5 attempts × 15 providers = 7,425 requests;
-raw data in [`official_results/benchmark-2026-08-11T22-44-25-322Z.json`](official_results/benchmark-2026-08-11T22-44-25-322Z.json)).
-
-> **These numbers predate the current adapter configurations.** Six adapters ran below the strongest
-> proxy tier their API offers when this run was collected. ScrapingBee is the one to discount hardest:
-> it was fetched from the default datacenter pool with no `premium_proxy` or `stealth_proxy`, which is the
-> weakest anti-bot posture of any provider in the table. The adapters have since been corrected; the table
-> has not been re-collected. Treat the ranking as stale until a re-run replaces it.
+Official run: **September 15, 2026** (100 targets × 5 attempts × 16 providers = 8,000 requests;
+raw data in [`official_results/benchmark-2026-09-16T01-03-47-074Z.json`](official_results/benchmark-2026-09-16T01-03-47-074Z.json)).
 
 | Rank | Provider    | Success rate | Latency score |  Passed |
 | ---: | ----------- | -----------: | ------------: | ------: |
-|    1 | string      |        97.0% |         9.98s | 480/495 |
-|    2 | scrapfly    |        82.0% |        18.35s | 406/495 |
-|    3 | context_dev |        79.2% |        12.68s | 392/495 |
-|    4 | firecrawl   |        78.6% |         9.21s | 389/495 |
-|    5 | bright      |        78.0% |        26.14s | 386/495 |
-|    6 | oxylabs     |        76.8% |        14.67s | 380/495 |
-|    7 | zyte        |        72.7% |        14.85s | 360/495 |
-|    8 | decodo      |        70.7% |        22.63s | 350/495 |
-|    9 | nimble      |        66.3% |        18.41s | 328/495 |
-|   10 | scraperapi  |        64.2% |        13.65s | 318/495 |
-|   11 | scrapingdog |        54.3% |        12.51s | 269/495 |
-|   12 | browserbase |        42.2% |        14.19s | 209/495 |
-|   13 | zenrows     |        34.3% |        17.60s | 170/495 |
-|   14 | scrapingant |        30.7% |        16.08s | 152/495 |
-|   15 | scrapingbee |        29.7% |        16.97s | 147/495 |
+|    1 | string      |        97.0% |         7.06s | 485/500 |
+|    2 | scrapfly    |        86.2% |        19.79s | 431/500 |
+|    3 | scraperapi  |        84.0% |        12.97s | 420/500 |
+|    4 | firecrawl   |        80.2% |         9.11s | 401/500 |
+|    5 | apify       |        77.4% |        20.64s | 387/500 |
+|    6 | bright      |        74.6% |        15.62s | 373/500 |
+|    7 | scrapingbee |        73.0% |        21.96s | 365/500 |
+|    8 | context_dev |        72.0% |        16.32s | 360/500 |
+|    9 | oxylabs     |        69.0% |        15.86s | 345/500 |
+|   10 | nimble      |        68.6% |        21.54s | 343/500 |
+|   11 | zyte        |        68.0% |        17.46s | 340/500 |
+|   12 | decodo      |        50.6% |        25.41s | 253/500 |
+|   13 | scrapingdog |        45.6% |        26.55s | 228/500 |
+|   14 | browserbase |        41.4% |        17.73s | 207/500 |
+|   15 | zenrows     |        41.2% |        18.80s | 206/500 |
+|   16 | scrapingant |        36.4% |        18.95s | 182/500 |
 
 ## Latency scoring
 
@@ -74,7 +69,7 @@ npm run benchmark      # Node (tsx)
 bun run src/cli.ts     # Bun
 
 # Recalculate a report from stored results without sending provider requests
-npm run analyze -- --in official_results/benchmark-2026-08-11T22-44-25-322Z.json --out results/recalculated-latency.txt
+npm run analyze -- --in official_results/benchmark-2026-09-16T01-03-47-074Z.json --out results/recalculated-latency.txt
 ```
 
 A smoke test against a single provider and a single fixture:
@@ -104,7 +99,7 @@ plus per-provider, per-test breakdown to a companion text report. Use `--report-
 Recalculate the current scoring from a stored benchmark JSON file without calling providers:
 
 ```bash
-npm run analyze -- --in official_results/benchmark-2026-08-11T22-44-25-322Z.json --out results/recalculated-latency.txt
+npm run analyze -- --in official_results/benchmark-2026-09-16T01-03-47-074Z.json --out results/recalculated-latency.txt
 ```
 
 | Option                   | Description                                                        |
@@ -178,23 +173,23 @@ the change.
   same artifact. ScrapingBee uses Auto Mode with `max_cost: 75`, letting the vendor choose the proxy pool
   and rendering;
   ZenRows and Decodo render because their adapters predate this note.
-- Rendering is mostly not the bypass. Among the seven caller-selected providers — the ones whose adapter
-  sets the flag, so we know what was requested — 12 of the 99 targets were passed by an unrendered
-  provider alone, against 2 passed by a rendering provider alone. Requiring a majority of attempts makes
-  it 15 against 4; requiring all five, 20 against 6. So rendering earns its place on a handful of targets
+- Rendering is mostly not the bypass. Among the six caller-selected providers — the ones whose adapter
+  sets the flag, so we know what was requested — 32 of the 100 targets were passed by an unrendered
+  provider alone, against none passed by a rendering provider alone. Requiring a majority of attempts makes
+  it 37 against 0; requiring all five, 45 against 2. So rendering earns its place on a couple of targets
   and costs on most. Bot protection keys on IP reputation and TLS fingerprint before it looks at content,
   so a headless browser mostly buys cost, latency and one more thing to fingerprint — and latency is a
   scored column here. A more expensive tier is not automatically a stronger one. Providers that choose
   rendering server-side are excluded from this comparison; they cannot be sorted into either column
   without guessing.
 - In the recorded run, providers fell into two groups, and the distinction matters when reading the numbers:
-  - **Caller-selected tier.** ScrapingBee, ScraperAPI, ScrapingAnt, Scrapingdog, ZenRows, Decodo and
-    Scrapfly expose the proxy pool as a request parameter. Each adapter pinned the top pool, so every
-    attempt started there rather than escalating into it after a block. ScrapingBee now uses Auto Mode
-    and belongs to the server-side escalation group for future runs.
-  - **Server-side escalation.** Zyte, Nimble, Firecrawl, Bright Data, Oxylabs, Context.dev, Browserbase and
-    String decide the bypass strategy themselves. The adapter asks for the strongest mode it can name and
-    the vendor picks the rest, so the configuration is not fully observable from this repo.
+  - **Caller-selected tier.** ScraperAPI, ScrapingAnt, Scrapingdog, ZenRows, Decodo and Scrapfly expose
+    the proxy pool as a request parameter. Each adapter pinned the top pool, so every attempt started
+    there rather than escalating into it after a block.
+  - **Server-side escalation.** ScrapingBee (Auto Mode), Apify, Zyte, Nimble, Firecrawl, Bright Data,
+    Oxylabs, Context.dev, Browserbase and String decide the bypass strategy themselves. The adapter asks
+    for the strongest mode it can name and the vendor picks the rest, so the configuration is not fully
+    observable from this repo.
   Because String is in the second group, its result reflects our own server-side routing and is not
   parameter-comparable with a pinned-tier provider. Read it as the service's default behaviour.
 - See the per-file comments for the exact request shape and the credit cost it implies.
@@ -204,7 +199,7 @@ the change.
 
 ## Target sites
 
-The suite is 99 domains, one target URL each, defined in [`src/tests.const.ts`](src/tests.const.ts).
+The suite is 100 domains, one target URL each, defined in [`src/tests.const.ts`](src/tests.const.ts).
 Every provider is sent this same list, in the order below. **Site** is the fixture name `--tests`
 accepts. **Industry** is the fixture's `industry` field, an editorial grouping of the suite by the kind
 of data behind the URL; every target carries exactly one. **Anti-bot** is the fixture's `antibot` field;
@@ -212,9 +207,9 @@ of data behind the URL; every target carries exactly one. **Anti-bot** is the fi
 
 Vendor spread: Akamai Bot Manager 20, DataDome 20, Cloudflare 15, PerimeterX / HUMAN 9, In-house /
 custom 9, AWS WAF 7, Kasada 3, Fastly Bot Management 1, Imperva Incapsula 1, Temu (in-house) 1,
-Ticketmaster (in-house) 1, Not classified 12.
+Ticketmaster (in-house) 1, Not classified 13.
 
-Industry spread: Retail & ecommerce 16, Fashion & luxury 11, Marketplaces & classifieds 10, Travel 9,
+Industry spread: Retail & ecommerce 17, Fashion & luxury 11, Marketplaces & classifieds 10, Travel 9,
 News & finance 9, Social media 8, Real estate 7, Reviews & local 6, Jobs & hiring 5, Grocery & food 5,
 Tickets & events 4, Developer & research 3, Search engines 2, Gaming & betting 2, Health & pharmacy 1,
 Government 1.
@@ -320,6 +315,7 @@ Government 1.
 | 97 | github | github.com | [link](https://github.com/facebook/react) | Developer & research | Not classified |
 | 98 | stackoverflow | stackoverflow.com | [link](https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array) | Developer & research | Cloudflare |
 | 99 | arxiv | arxiv.org | [link](https://arxiv.org/abs/1706.03762) | Developer & research | Not classified |
+| 100 | buybuybaby | buybuybaby.bedbathandbeyond.com | [link](https://buybuybaby.bedbathandbeyond.com/Baby/Cloud-Muslin-Sage-WHite-5pc-Bedding-Set-Levtex-Baby/43435980/product.html) | Retail & ecommerce | Not classified |
 
 ## License
 
