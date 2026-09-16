@@ -700,3 +700,78 @@ export const WEB_ACCESS_ALL_TESTS: WebAccessTestConfig[] = [
     containsText: "Cloud Muslin Sage/WHite 5pc Bedding Set - Levtex Baby",
   },
 ];
+
+/**
+ * Automotive and vehicle-history targets: European car classifieds plus the North American
+ * salvage-auction sources that back VIN history lookups.
+ *
+ * Kept out of `WEB_ACCESS_ALL_TESTS` on purpose. That array is the published suite behind the
+ * reported headline numbers, so adding targets to it would silently change the composition and
+ * make a new run non-comparable with earlier ones. Select this suite explicitly instead:
+ * `--suite automotive`.
+ */
+export const WEB_ACCESS_AUTOMOTIVE_TESTS: WebAccessTestConfig[] = [
+  {
+    name: "autoplius",
+    url: "https://autoplius.lt/skelbimai/naudoti-automobiliai",
+    antibot: "cloudflare",
+    industry: "Automotive & vehicle data",
+    containsText: "Naudoti automobiliai",
+  },
+  {
+    name: "auto24",
+    url: "https://www.auto24.ee/kasutatud/nimekiri.php",
+    antibot: "cloudflare",
+    industry: "Automotive & vehicle data",
+    containsText: "Otsingutulemus",
+  },
+  {
+    name: "otomoto",
+    url: "https://www.otomoto.pl/osobowe",
+    antibot: "datadome",
+    industry: "Automotive & vehicle data",
+    containsText: "Samochody Osobowe",
+  },
+  {
+    name: "mobile.de",
+    url: "https://suchen.mobile.de/fahrzeuge/search.html?dam=false&isSearchRequest=true&ref=quickSearch&sfmr=false&vc=Car",
+    antibot: "akamai",
+    industry: "Automotive & vehicle data",
+    containsText: "PKW-Suche",
+  },
+  {
+    // No vendor anti-bot observed on this path; the only captcha references belong to the
+    // sign-in flow, so `antibot` is left unset rather than guessed.
+    name: "autoscout24",
+    url: "https://www.autoscout24.com/lst",
+    industry: "Automotive & vehicle data",
+    containsText: "Used cars for sale",
+  },
+  {
+    name: "iaai",
+    url: "https://www.iaai.com/Search?url=oZarsGdmw6Zt5S7B5TnDjw%3d%3d",
+    antibot: "incapsula",
+    industry: "Automotive & vehicle data",
+    containsText: "Salvage Vehicles For Sale",
+  },
+  {
+    name: "copart",
+    url: "https://www.copart.com/lotSearchResults?free=true&query=honda",
+    antibot: "incapsula",
+    industry: "Automotive & vehicle data",
+    containsText: "Online Car Auctions",
+  },
+  {
+    name: "bidfax",
+    url: "https://en.bidfax.info/",
+    antibot: "cloudflare",
+    industry: "Automotive & vehicle data",
+    containsText: "Free history of sales",
+  },
+];
+
+/** Selectable target suites. `default` is the published suite; everything else is opt-in. */
+export const WEB_ACCESS_SUITES: Record<string, WebAccessTestConfig[]> = {
+  default: WEB_ACCESS_ALL_TESTS,
+  automotive: WEB_ACCESS_AUTOMOTIVE_TESTS,
+};
