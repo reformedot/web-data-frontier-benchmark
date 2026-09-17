@@ -19,7 +19,7 @@ raw data in [`official_results/benchmark-2026-09-16T01-03-47-074Z.json`](officia
 |    2 | scrapfly    |        86.2% |        19.79s | 431/500 |
 |    3 | scraperapi  |        84.0% |        12.97s | 420/500 |
 |    4 | firecrawl   |        80.2% |         9.11s | 401/500 |
-|    5 | apify       |        77.4% |        20.64s | 387/500 |
+|    5 | apify†      |        77.4% |        20.64s | 387/500 |
 |    6 | bright      |        74.6% |        15.62s | 373/500 |
 |    7 | scrapingbee |        73.0% |        21.96s | 365/500 |
 |    8 | context_dev |        72.0% |        16.32s | 360/500 |
@@ -31,6 +31,12 @@ raw data in [`official_results/benchmark-2026-09-16T01-03-47-074Z.json`](officia
 |   14 | browserbase |        41.4% |        17.73s | 207/500 |
 |   15 | zenrows     |        41.2% |        18.80s | 206/500 |
 |   16 | scrapingant |        36.4% |        18.95s | 182/500 |
+
+† The `apify` score is a **Web Fetch** result. It was collected with the previous adapter, which sent every target
+to the generic [Web Fetch](https://apify.com/apify/web-fetch) Actor. The current adapter routes 77 targets to
+source-specific Store Actors and fails the other 23 without a request, so it cannot reproduce this number: 86 of the
+387 passes are on targets it now rejects, and its ceiling is 385/500. The row stands as the Web Fetch measurement
+until Apify is rerun under the new routing.
 
 ## Latency scoring
 
