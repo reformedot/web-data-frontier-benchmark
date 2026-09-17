@@ -135,7 +135,7 @@ export const WEB_ACCESS_ALL_TESTS: WebAccessTestConfig[] = [
     url: "https://www.yelp.com/search?find_desc=mexican+restuarant&find_loc=Chicago%2C+IL",
     antibot: "datadome",
     industry: "Reviews & local",
-    containsText: "Top 10 Best mexican restaurant Near Chicago, Illinois",
+    containsText: "Top 10 Best mexican restaurant in Chicago, Illinois",
   },
   {
     name: "zara",

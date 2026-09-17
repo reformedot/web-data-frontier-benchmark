@@ -128,6 +128,7 @@ npm run analyze -- --in official_results/benchmark-2026-09-16T01-03-47-074Z.json
 | nimble                             | `NIMBLE_API_KEY`                                          |
 | context_dev                        | `CONTEXT_DEV_API_KEY`                                     |
 | browserbase                        | `BROWSERBASE_API_KEY`                                     |
+| browser_use                        | `BROWSER_USE_API_KEY`                                     |
 | string                             | `STRING_API_KEY`                                          |
 
 ## Programmatic use
